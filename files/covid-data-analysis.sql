@@ -134,6 +134,7 @@ join covid.covidVaccinations vac
 WHERE dea.continent IS NOT NULL    
 -- ORDER BY 2,3; CANT DO ORDER BY IN CTE
 )
+-- getting the percent of those vaxxed compared to population
 select *, (rollingCount_VaccinatedPeople/population)*100 as percentVaxxed
 from pop_vs_vac;
 
@@ -142,9 +143,9 @@ from pop_vs_vac;
 
 -- Here I am using a drop table statement just in case I make any changes it will be easier to 
 -- to manage to do
-DROP TABLE IF EXISTS percentPopulationVaccinated;
+DROP TABLE IF EXISTS VaccinatedPopulationCount;
 
-CREATE TEMPORARY TABLE percentPopulationVaccinated (
+CREATE TEMPORARY TABLE VaccinatedPopulationCount (
 continent text,
 location text,
 date date,
@@ -152,7 +153,7 @@ population double,
 new_vaccinations double,
 rollingCount_VaccinatedPeople double);
 
-INSERT INTO percentPopulationVaccinated
+INSERT INTO VaccinatedPopulationCount
 SELECT dea.continent, dea.location, dea.date, dea.population, vac.new_vaccinations, 
 SUM(vac.new_vaccinations) OVER (PARTITION BY dea.location ORDER BY dea.location, dea.date ) as rollingCount_VaccinatedPeople
 FROM covid.covidDeaths dea
@@ -162,16 +163,25 @@ join covid.covidVaccinations vac
 WHERE dea.continent IS NOT NULL;
 
 select *, (rollingCount_VaccinatedPeople/population)*100 as percentVaxxed
-from percentPopulationVaccinated;
+from PopulationVaccinatedCount;
 
 
 -- CREATING A VIEW TO STORE DATA FOR VISUALIZATION
+DROP VIEW IF EXISTS PopulationVaccinatedCount;
 
-CREATE VIEW percentofPopulationVaccinatedView AS 
+CREATE VIEW PopulationVaccinatedCount AS 
 SELECT dea.continent, dea.location, dea.date, dea.population, vac.new_vaccinations, 
 SUM(vac.new_vaccinations) OVER (PARTITION BY dea.location ORDER BY dea.location, dea.date ) as rollingCount_VaccinatedPeople
 FROM covid.covidDeaths dea
 join covid.covidVaccinations vac
 	on dea.location = vac.location
     and dea.date = vac.date
-WHERE dea.continent IS NOT NULL;
+WHERE dea.continent IS NOT NULL; 
+
+-- remove nulls from view and replaces them with 0
+SELECT continent, location, date, population, IFNULL(new_vaccinations, 0) AS newvax, IFNULL(rollingCount_VaccinatedPeople, 0) AS vaxcount 
+FROM PopulationVaccinatedCount
+where location like '%state%';
+
+Select DISTINCT(continent)
+FROM PopulationVaccinatedCount;
